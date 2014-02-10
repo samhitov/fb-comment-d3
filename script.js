@@ -8,7 +8,7 @@ $(document).ready(function(){
 	});
 });
 
-// Basic form error checking, then get the JSON and pass to a handler
+// Basic form error checking, then pass to the chart builder.
 var getComments = function(){
 	var url = $('#term').val();
 
@@ -16,11 +16,213 @@ var getComments = function(){
 		$('#comments').html("<h2>Whoops, did you mean to enter a blank url?</h2>");
 	}
 	else {
-		$.getJSON("http://graph.facebook.com/comments/?filter=stream&limit=20&ids=" + url, onLoadJSON);
+		buildGraphs(url);
+//		$.getJSON("http://graph.facebook.com/comments/?filter=stream&limit=20&ids=" + url, onLoadJSON);
 	}
 }
 
+var buildGraphs = function(url) {
+	//topCommenters(url);
+	scatter(url);
+}
 
+/* Scatter plot graph:
+ * X: time of day (UTC)
+ * Y: day of week
+ * On mouseover: tooltip with information about the comment
+ *
+ * params:
+ * url: URL of webpage containing facebook comments
+ */
+var scatter = function(url) {
+	/* Build the query using FQL (https://developers.facebook.com/docs/reference/fql/‎)
+	 *
+	 * select: an array of fields to select
+	 * from: FQL table
+	 * 
+	 * @TODO: for readability, maybe use ' ' instead of '+' while building, then swap in the '+' before getJSON()
+	 * @TODO: replace with helper function
+	 */
+	var select = ['id', 'time'];
+	var from = 'comment';
+	var query = 'http://graph.facebook.com/fql?q='
+		+ 'SELECT+' + select.join(',')
+		+ '+FROM+' + from
+		+ '+WHERE+object_id+IN+(SELECT+comments_fbid+FROM+link_stat+WHERE+url+="'+ url + '")';
+	console.log(query);
+
+	$.getJSON(query, function(json) {
+		console.log(json);
+
+		// Prepare dataset and build the graph
+		var dataset = scatterPrepareData(json);
+		scatterGraph(dataset);
+
+		/* Prepare dataset:
+		 * 
+		 * convert timestamp into day of week (x) and seconds after start of day (y)
+		 * note: multiply timestamp by 1000, because javascript Date uses milliseconds
+		 */
+		 /*
+		 var dataset = json['data'];
+		 for (index in dataset) {
+//			console.log[index];
+		 	var date = new Date(1000 * dataset[index]['time']);
+		 	dataset[index]['day'] = date.getDay();
+		 	dataset[index]['seconds'] = (3600 * date.getHours() + 60 * date.getMinutes() + date.getSeconds());
+		 }
+		*/
+//		 console.log(dataset);
+	});
+}
+
+/* Prepare dataset for the scatterplot graph:
+ * 
+ * convert timestamp into day of week (x) and seconds after start of day (y)
+ * note: multiply initial timestamp by 1000, because javascript Date uses milliseconds
+ *
+ * @return: array of objects {
+ *   'id': FQL comment ID
+ *   'time': FQL timestamp
+ *   'day': day of week (0-6) -- new property -- y axis
+ *   'seconds': seconds after start of day -- new property -- x axis
+ * }
+ */
+var scatterPrepareData = function(json) {
+	 var dataset = json['data'];
+	 for (index in dataset) {
+	 	var date = new Date(1000 * dataset[index]['time']);
+	 	dataset[index]['day'] = date.getDay();
+	 	dataset[index]['seconds'] = (3600 * date.getHours() + 60 * date.getMinutes() + date.getSeconds());
+	 	// the data above wasn't spread out. As a proof of concept, try just using minutes & seconds
+	 	dataset[index]['x'] = date.getMinutes();
+	 	dataset[index]['y'] = date.getSeconds();
+	 }
+	 return dataset;
+}
+
+/* Build scatter plot graph from a prepared dataset.
+ *
+ * X: time of day (UTC)
+ * Y: day of week
+ * On mouseover: tooltip with information about the comment
+ */
+var scatterGraph = function(dataset) {
+	//var width = 500;
+	//var height = 60;
+	// use this width and height for minutes / seconds
+	var width = 600;
+	var height = 300;
+
+	// Define scales
+	var xAxisScale = d3.scale.linear()
+		.domain([0,60])
+		.range([0,width]);
+	var yAxisScale = d3.scale.linear()
+		.domain([0,60])
+		.range([0,height]);
+
+	// Define X axis
+	var xAxis = d3.svg.axis()
+		.scale(xAxisScale)
+		.orient("bottom")
+		.ticks(10)
+//		.tickFormat(d3.format(".1%"));
+
+	// Define Y axis
+	var yAxis = d3.svg.axis()
+		.scale(yAxisScale)
+		.orient("left")
+		.ticks(10)
+//		.tickFormat(d3.format(".1%"));
+
+	// Create svg
+	var svg = d3.select("#graphs")
+		.append("svg")
+		.attr("width", width)
+		.attr("height", height);
+
+	svg.selectAll("circle")
+		.data(dataset)
+		.enter()
+		.append("circle")
+		.attr("cx", function(d) {
+			// hack together a scale until I learn how to properly do it
+			//return d['seconds'] * (500.0 / 86400.0);
+			return d['x'] * 10;
+		})
+		.attr("cy", function(d) {
+			// hack together a scale until I learn how to properly do it
+			//return d['day'] * 10;
+			return d['y'] * 5;
+		})
+		.attr("r", function(d) {
+	   		return 1;
+   		});
+
+	// Create X axis
+   	svg.append("g")
+//		.attr("class", "axis")
+//		.attr("transform", "translate(0," + (height) + ")")
+		.call(xAxis);
+
+	// Create Y axis
+	svg.append("g")
+//		.attr("class", "axis")
+//		.attr("transform", "translate(0,0)")
+		.call(yAxis);
+
+}
+
+var topCommenters = function(url) {
+	$.getJSON('http://graph.facebook.com/fql?q=SELECT+fromid+FROM+comment+WHERE+object_id+IN+(SELECT+comments_fbid+FROM+link_stat+WHERE+url+="' + url + '")', function(json) {
+		console.log(json);
+		var commenters = {};
+		console.log(commenters);
+		for (index in json['data']) {
+			var id = json['data'][index]['fromid'];
+			if (commenters.hasOwnProperty(id)) {
+				commenters[id]++;
+			} else {
+				commenters[id] = 1;
+			}
+		}
+		console.log(commenters);
+
+/*
+1. array[{key, value}, {key, value}]
+2. {value: valueCount, value: valueCount} O(n)
+3. array[{value, count}, {value, count}] O(n)
+4. sort ^ O(log(n))
+
+function prepareDataSet(data) {
+	// 1 -> 2
+	var tmpobject = {};
+	var dataset = [];
+	for (index in data) {
+		var id = data[index]['fromid'];
+		if (tmpobject.hasOwnProperty(id)) {
+			tmpobject[id]++;
+		} else {
+			tmpobject[id] = 1;
+		}
+	}
+
+	// 2 -> 3
+	for (prop in tmpobject) {
+		dataset.push({"user id": prop, "comment count": tmpobject[prop]});
+	}
+
+	// 3 -> 4
+	dataset.sort(function(a, b){return a['comment count'] - b['comment count']});
+}
+
+
+	});
+}
+
+http://graph.facebook.com/fql?q=SELECT+fromid+FROM+comment+WHERE+object_id+IN+(SELECT+comments_fbid+FROM+link_stat+WHERE+url+='http://developers.facebook.com/blog/post/472')
+*/
 //    $.getJSON("http://graph.facebook.com/comments/?ids=http://developers.facebook.com/docs/reference/plugins/comments", onLoadJSON);
 
 // This is the taskmaster. Wipe the screen, then call appropriate builders.
