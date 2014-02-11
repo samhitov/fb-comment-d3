@@ -38,9 +38,9 @@ var addTab = function(id) {
 }
 
 /* Scatter plot graph:
- * X: time of day (UTC)
- * Y: day of week
- * On mouseover: tooltip with information about the comment
+ * X: time of post (minutes after the hour)
+ * Y: time of post (seconds after the minute)
+ * @TODO: On mouseover: tooltip with information about the comment
  *
  * params:
  * url: URL of webpage containing facebook comments
@@ -48,9 +48,6 @@ var addTab = function(id) {
 var scatter = function(url) {
 	// Add a tab for the graph
 	addTab('scatter');
-//	console.log("appending tab");
-//	$('#graphtabs').append('<li><a href="#scatter">Scatter Plot</a></li>');
-//	$('#tabs').append('<div id="scatter"></div>');
 
 	/* Build the query using FQL (https://developers.facebook.com/docs/reference/fql/‎)
 	 *
@@ -74,22 +71,6 @@ var scatter = function(url) {
 		// Prepare dataset and build the graph
 		var dataset = scatterPrepareData(json);
 		scatterGraph(dataset);
-
-		/* Prepare dataset:
-		 * 
-		 * convert timestamp into day of week (x) and seconds after start of day (y)
-		 * note: multiply timestamp by 1000, because javascript Date uses milliseconds
-		 */
-		 /*
-		 var dataset = json['data'];
-		 for (index in dataset) {
-//			console.log[index];
-		 	var date = new Date(1000 * dataset[index]['time']);
-		 	dataset[index]['day'] = date.getDay();
-		 	dataset[index]['seconds'] = (3600 * date.getHours() + 60 * date.getMinutes() + date.getSeconds());
-		 }
-		*/
-//		 console.log(dataset);
 	});
 }
 
@@ -97,6 +78,7 @@ var scatter = function(url) {
  * 
  * convert timestamp into day of week (x) and seconds after start of day (y)
  * note: multiply initial timestamp by 1000, because javascript Date uses milliseconds
+ * note: I got boring data using [day, timeInSeconds], so for now I'm using [minutes, seconds]
  *
  * @return: array of objects {
  *   'id': FQL comment ID
@@ -120,15 +102,13 @@ var scatterPrepareData = function(json) {
 
 /* Build scatter plot graph from a prepared dataset.
  *
- * X: time of day (UTC)
- * Y: day of week
- * On mouseover: tooltip with information about the comment
+ * X: time of post (minutes after the hour)
+ * Y: time of post (seconds after the minute)
+ * @TODO: On mouseover: tooltip with information about the comment
  */
 var scatterGraph = function(dataset) {
 	console.log('building "scatter", the scatter plot');
 	console.log(dataset);
-	//var width = 500;
-	//var height = 60;
 	// use this width and height for minutes / seconds
 	var width = 600;
 	var height = 300;
@@ -146,14 +126,12 @@ var scatterGraph = function(dataset) {
 		.scale(xAxisScale)
 		.orient("bottom")
 		.ticks(10);
-//		.tickFormat(d3.format(".1%"));
 
 	// Define Y axis
 	var yAxis = d3.svg.axis()
 		.scale(yAxisScale)
 		.orient("left")
 		.ticks(10);
-//		.tickFormat(d3.format(".1%"));
 
 	// Create svg
 	var svg = d3.select("#scatter")
@@ -161,18 +139,17 @@ var scatterGraph = function(dataset) {
 		.attr("width", width)
 		.attr("height", height);
 
+	// Add data points
 	svg.selectAll("circle")
 		.data(dataset)
 		.enter()
 		.append("circle")
 		.attr("cx", function(d) {
 			// hack together a scale until I learn how to properly do it
-			//return d['seconds'] * (500.0 / 86400.0);
 			return d['x'] * 10;
 		})
 		.attr("cy", function(d) {
 			// hack together a scale until I learn how to properly do it
-			//return d['day'] * 10;
 			return d['y'] * 5;
 		})
 		.attr("r", function(d) {
@@ -181,18 +158,16 @@ var scatterGraph = function(dataset) {
 
 	// Create X axis
    	svg.append("g")
-//		.attr("class", "axis")
-//		.attr("transform", "translate(0," + (height) + ")")
 		.call(xAxis);
 
 	// Create Y axis
 	svg.append("g")
-//		.attr("class", "axis")
-//		.attr("transform", "translate(0,0)")
 		.call(yAxis);
 
 }
 
+/* @TODO: Will give information on the top commenters, by number of posts
+ */
 var topCommenters = function(url) {
 	$.getJSON('http://graph.facebook.com/fql?q=SELECT+fromid+FROM+comment+WHERE+object_id+IN+(SELECT+comments_fbid+FROM+link_stat+WHERE+url+="' + url + '")', function(json) {
 		console.log(json);
@@ -242,11 +217,13 @@ function prepareDataSet(data) {
 	});
 }
 
+// note: this is just an example of FQL, for me to copy/paste as needed while testing
 http://graph.facebook.com/fql?q=SELECT+fromid+FROM+comment+WHERE+object_id+IN+(SELECT+comments_fbid+FROM+link_stat+WHERE+url+='http://developers.facebook.com/blog/post/472')
 */
 //    $.getJSON("http://graph.facebook.com/comments/?ids=http://developers.facebook.com/docs/reference/plugins/comments", onLoadJSON);
 
 // This is the taskmaster. Wipe the screen, then call appropriate builders.
+// @TODO: get rid of this asap
 var onLoadJSON = function(json) {
 	console.log(json);
 
@@ -294,13 +271,6 @@ var barChart = function(json) {
 				return d;  //Just the data value
 		});
 }
-//});
-/*
-function onLoadJSON(json) {
-    $.each(json["http://developers.facebook.com/docs/reference/plugins/comments"].comments.data, function(i, item){ 
-       $('ul').append("<li>"+item.from.name+"</li>");
-    });
-}
-*/
 
+// note: this is an ok URL to pull comments from for testing
 //http://developers.facebook.com/docs/reference/plugins/comments
