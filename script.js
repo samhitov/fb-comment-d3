@@ -1,5 +1,6 @@
 // Set up handlers
 $(document).ready(function(){
+//	$('#graphs').tabs({collapsible: true});
 	$('#search').click(function(){getComments();});
 	$('#term').keyup(function(event){
 		if(event.keyCode == 13){
@@ -24,6 +25,16 @@ var getComments = function(){
 var buildGraphs = function(url) {
 	//topCommenters(url);
 	scatter(url);
+	// this one is just a silly bar graph to test JQuery tabs
+	addTab('bar');
+	$.getJSON("http://graph.facebook.com/comments/?filter=stream&limit=20&ids=" + url, onLoadJSON);
+	$('#tabs').tabs({collapsible: true});
+}
+
+var addTab = function(id) {
+	console.log("appending tab");
+	$('#graphtabs').append('<li><a href="#' + id + '">' + id + '</a></li>');
+	$('#tabs').append('<div id="' + id + '"></div>');	
 }
 
 /* Scatter plot graph:
@@ -35,12 +46,18 @@ var buildGraphs = function(url) {
  * url: URL of webpage containing facebook comments
  */
 var scatter = function(url) {
+	// Add a tab for the graph
+	addTab('scatter');
+//	console.log("appending tab");
+//	$('#graphtabs').append('<li><a href="#scatter">Scatter Plot</a></li>');
+//	$('#tabs').append('<div id="scatter"></div>');
+
 	/* Build the query using FQL (https://developers.facebook.com/docs/reference/fql/‎)
 	 *
 	 * select: an array of fields to select
 	 * from: FQL table
 	 * 
-	 * @TODO: for readability, maybe use ' ' instead of '+' while building, then swap in the '+' before getJSON()
+	 * @TODO:\ for readability, maybe use ' ' instead of '+' while building, then swap in the '+' before getJSON()
 	 * @TODO: replace with helper function
 	 */
 	var select = ['id', 'time'];
@@ -108,6 +125,8 @@ var scatterPrepareData = function(json) {
  * On mouseover: tooltip with information about the comment
  */
 var scatterGraph = function(dataset) {
+	console.log('building "scatter", the scatter plot');
+	console.log(dataset);
 	//var width = 500;
 	//var height = 60;
 	// use this width and height for minutes / seconds
@@ -126,18 +145,18 @@ var scatterGraph = function(dataset) {
 	var xAxis = d3.svg.axis()
 		.scale(xAxisScale)
 		.orient("bottom")
-		.ticks(10)
+		.ticks(10);
 //		.tickFormat(d3.format(".1%"));
 
 	// Define Y axis
 	var yAxis = d3.svg.axis()
 		.scale(yAxisScale)
 		.orient("left")
-		.ticks(10)
+		.ticks(10);
 //		.tickFormat(d3.format(".1%"));
 
 	// Create svg
-	var svg = d3.select("#graphs")
+	var svg = d3.select("#scatter")
 		.append("svg")
 		.attr("width", width)
 		.attr("height", height);
@@ -188,6 +207,8 @@ var topCommenters = function(url) {
 			}
 		}
 		console.log(commenters);
+	});
+}
 
 /*
 1. array[{key, value}, {key, value}]
@@ -231,10 +252,12 @@ var onLoadJSON = function(json) {
 
 	$('#comments, #graphs').empty();
 
+/*
 	$('#comments').append("<ul id='names'</ul>");
 	$.each(json[$('#term').val()]["comments"]["data"], function(i, item){
 		$('ul#names').append("<li>"+item.from.name+"</li>");
 	});
+*/
 	buildCharts(json);
 }
 
@@ -254,7 +277,7 @@ var barChart = function(json) {
 			dataset.push(item["message"].length);
 		});
 
-		var svg = d3.select("#graphs").append("svg").attr("width", w).attr("height", h); // <-- and here!
+		var svg = d3.select("#bar").append("svg").attr("width", w).attr("height", h); // <-- and here!
 
 		svg.selectAll("rect")
 		.data(dataset)
@@ -269,8 +292,8 @@ var barChart = function(json) {
 		.attr("width", w / dataset.length - barPadding)
 		.attr("height", function(d) {
 				return d;  //Just the data value
-			});
-	}
+		});
+}
 //});
 /*
 function onLoadJSON(json) {
